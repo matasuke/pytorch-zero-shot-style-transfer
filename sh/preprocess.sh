@@ -1,10 +1,18 @@
 # preprocess small parallel corpora
 python preprocessor/text_preprocessor.py \
-    -data_path data/corpora/small_parallel.ja \
-    -save_path data/preprocessor/small_parallel.8000.ja.pkl \
-    -max_vocab_size 8000
-
-python preprocessor/text_preprocessor.py \
-    -data_path data/corpora/small_parallel.en \
-    -save_path data/preprocessor/small_parallel.8000.en.pkl \
-    -max_vocab_size 8000
+    --data_paths \
+        'data/corpora/tokenized/OpenSubtitles.en-ja.tokenized.en' \
+        'data/corpora/tokenized/OpenSubtitles.en-ja.tokenized.ja' \
+        'data/corpora/tokenized/OpenSubtitles.en-zh_cn.tokenized.en' \
+        'data/corpora/tokenized/OpenSubtitles.en-zh_cn.tokenized.zh_cn' \
+        'data/corpora/tokenized/OpenSubtitles.ja-zh_cn.tokenized.ja' \
+        'data/corpora/tokenized/OpenSubtitles.ja-zh_cn.tokenized.zh_cn' \
+        'data/corpora/tokenized/ted-si.tokenized.en' \
+        'data/corpora/tokenized/ted-si.tokenized.ja' \
+        'data/corpora/tokenized/TED.tokenized.ch' \
+        'data/corpora/tokenized/TED.tokenized.ja' \
+     \
+    --languages '<2EN>' '<2JA>' '<2CH>' \
+    --styles '<2OST>' '<2SI>' '<2TED>' \
+    --save_path data/preprocessor/ost-ted-si.32000.pkl \
+    --max_vocab_size 32000

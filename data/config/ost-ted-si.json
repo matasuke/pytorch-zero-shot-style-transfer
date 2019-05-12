@@ -1,5 +1,5 @@
 {
-    "name": "aspec-1",
+    "name": "zero-shot-style-transfer",
     "n_gpu": 4,
     "arch": {
         "type": "Model",
@@ -22,72 +22,59 @@
         "type": "Seq2seqDataLoader",
         "args":{
             "src_path": [
-                    "data/corpora/ost.ja",
-                    "data/corpora/ost.ja",
-                    "data/corpora/ost.en",
-                    "data/corpora/ost.en",
-                    "data/corpora/ost.ch",
-                    "data/corpora/ost.ch",
-                    "data/corpora/si.ja",
-                    "data/corpora/si.en",
-                    "data/corpora/ted.ja",
-                    "data/corpora/ted.ja",
-                    "data/corpora/ted.en",
-                    "data/corpora/ted.en",
-                    "data/corpora/ted.ch",
-                    "data/corpora/ted.ch"
+                    "data/corpora/tokenized/OpenSubtitles.en-ja.tokenized.en",
+                    "data/corpora/tokenized/OpenSubtitles.en-ja.tokenized.ja",
+                    "data/corpora/tokenized/OpenSubtitles.en-zh_cn.tokenized.en",
+                    "data/corpora/tokenized/OpenSubtitles.en-zh_cn.tokenized.zh_cn",
+                    "data/corpora/tokenized/OpenSubtitles.ja-zh_cn.tokenized.ja",
+                    "data/corpora/tokenized/OpenSubtitles.ja-zh_cn.tokenized.zh_cn",
+                    "data/corpora/tokenized/ted-si.tokenized.ja",
+                    "data/corpora/tokenized/ted-si.tokenized.en",
+                    "data/corpora/tokenized/TED.tokenized.ja",
+                    "data/corpora/tokenized/TED.tokenized.ch"
             ],
             "tgt_path": [
-                    "data/corpora/ost.en",
-                    "data/corpora/ost.ch",
-                    "data/corpora/ost.ja",
-                    "data/corpora/ost.ch",
-                    "data/corpora/ost.ja",
-                    "data/corpora/ost.en",
-                    "data/corpora/si.en",
-                    "data/corpora/si.ja",
-                    "data/corpora/ted.en",
-                    "data/corpora/ted.ch",
-                    "data/corpora/ted.ja",
-                    "data/corpora/ted.ch",
-                    "data/corpora/ted.ja",
-                    "data/corpora/ted.en"
+                    "data/corpora/tokenized/OpenSubtitles.en-ja.tokenized.ja",
+                    "data/corpora/tokenized/OpenSubtitles.en-ja.tokenized.en",
+                    "data/corpora/tokenized/OpenSubtitles.en-zh_cn.tokenized.zh_cn",
+                    "data/corpora/tokenized/OpenSubtitles.en-zh_cn.tokenized.en",
+                    "data/corpora/tokenized/OpenSubtitles.ja-zh_cn.tokenized.zh_cn",
+                    "data/corpora/tokenized/OpenSubtitles.ja-zh_cn.tokenized.ja",
+                    "data/corpora/tokenized/ted-si.tokenized.en",
+                    "data/corpora/tokenized/ted-si.tokenized.ja",
+                    "data/corpora/tokenized/TED.tokenized.ch",
+                    "data/corpora/tokenized/TED.tokenized.ja"
             ],
-            "src_preprocessor_path": "data/preprocessor/aspec-1.ja.pkl",
-            "tgt_preprocessor_path": "data/preprocessor/aspec-1.en.pkl",
             "tgt_languages": [
-                    "<2EN>", "<2CH>", "<2JA>", "<2CH>", "<2JA>", "<2EN>", "<2EN>",
-                    "<2JA>", "<2EN>", "<2CH>", "<2JA>", "<2CH>", "<2JA>", "<2EN>"
+                    "<2JA>", "<2EN>", "<2CH>", "<2EN>", "<2CH>",
+                    "<2JA>", "<2EN>", "<2JA>", "<2CH>", "<2JA>"
             ],
             "tgt_styles": [
-                    "<2OST>","<2OST>","<2OST>", "<2OST>", "<2OST>", "<2OST>", "<2SI>",
-                    "<2SI>", "<2TED>", "<2TED>", "<2TED>", "<2TED>", "<2TED>", "<2TED>"
+                    "<2OST>","<2OST>","<2OST>", "<2OST>", "<2OST>",
+                    "<2OST>", "<2SI>","<2SI>", "<2TED>", "<2TED>"
             ],
-            "batch_size": 128,
+            "text_preprocessor_path": "data/preprocessor/ost-ted-si.32000.pkl",
+            "batch_size": 256,
             "shuffle": true,
-            "num_workers": 4
-        }
-    },
-    "val_data_loader": {
-        "type": "Seq2seqDataLoader",
-        "args":{
-            "src_path": "data/corpora/aspec/val.ja",
-            "tgt_path": "data/corpora/aspec/val.en",
-            "src_preprocessor_path": "data/preprocessor/aspec-1.ja.pkl",
-            "tgt_preprocessor_path": "data/preprocessor/aspec-1.en.pkl",
-            "batch_size": 128,
-            "shuffle": false,
+            "validation_split": 0.05,
             "num_workers": 4
         }
     },
     "test_data_loader": {
         "type": "Seq2seqDataLoader",
         "args":{
-            "src_path": "data/corpora/test.ja",
-            "tgt_path": "data/corpora/test.en",
-            "src_preprocessor_path": "data/preprocessor/aspec-1.ja.pkl",
-            "tgt_preprocessor_path": "data/preprocessor/aspec-1.en.pkl",
-            "batch_size": 128,
+            "src_path": [
+                    "data/corpora/tokenized/OpenSubtitles.en-ja.tokenized.ja",
+                    "data/corpora/tokenized/TED.tokenized.ja"
+            ],
+            "tgt_path": [
+                    "data/corpora/tokenized/OpenSubtitles.en-ja.tokenized.ja",
+                    "data/corpora/tokenized/TED.tokenized.ja"
+            ],
+            "tgt_languages": ["<2JA>", "<2JA>"],
+            "tgt_styles": ["<2SI>","<2SI>"],
+            "text_preprocessor_path": "data/preprocessor/ost-ted-si.32000.pkl",
+            "batch_size": 256,
             "shuffle": false,
             "num_workers": 4
         }
@@ -99,7 +86,7 @@
             "lr": 1,
             "lr_decay": 0.5,
             "max_grad_norm": 5,
-            "start_decay_at": null
+            "start_decay_at": 20
         }
     },
     "translator": {
