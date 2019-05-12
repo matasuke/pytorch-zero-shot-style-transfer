@@ -1,4 +1,4 @@
-from typing import Callable, Union, List
+from typing import Callable, Dict, Sequence, Union, List
 from pathlib import Path
 
 import torch
@@ -13,33 +13,46 @@ class Seq2SeqDataset(Dataset):
     '''
     Dataset for seq2seq
     '''
-    __slots__ = [
+    __slot__ = [
         'src_list',
         'tgt_list',
         'src_text_preprocessor',
         'tgt_text_preprocessor',
+        'tgt_langs',
+        'tgt_styles'
     ]
 
     def __init__(
             self,
-            src_list: List[str],
+            src_list: List[List[str]],
             src_text_preprocessor: TextPreprocessor,
-            tgt_list: List[str],
+            tgt_list: List[List[str]],
             tgt_text_preprocessor: TextPreprocessor,
+            tgt_langs: List[int],
+            tgt_styles: List[int],
     ):
         '''
         create seq2seq dataset.
 
-        :param src_list: list of source text
+        :param src_list: nested list of source text
         :param src_text_preprocessor: source text preprocessor
-        :param tgt_list: list of target text
+        :param tgt_list: nested list of target text
         :param tgt_text_preprocessor: target text preprocessor
+        :param tgt_langs: target languages to be translated from source sentences.
+        :parma tgt_styles: target styles to be translated from source sentences.
         '''
         self.src_list = src_list
         self.tgt_list = tgt_list
         self.src_text_preprocessor = src_text_preprocessor
         self.tgt_text_preprocessor = tgt_text_preprocessor
+        self.tgt_langs = tgt_langs
+        self.tgt_styles = tgt_styles
+
         assert len(src_list) == len(tgt_list)
+        assert len(src_list) == len(tgt_langs)
+        assert len(src_list) == len(tgt_styles)
+        assert tgt_text_preprocessor.num_languages == len(set(tgt_langs))
+        assert tgt_text_preprocessor.num_styles == len(set(tgt_styles))
 
     def __len__(self):
         return len(self.src_list)
@@ -53,43 +66,81 @@ class Seq2SeqDataset(Dataset):
         tgt_indices = self.tgt_text_preprocessor.tokens2indice(tgt_tokens, sos=True, eos=True)
         tgt_indices = torch.Tensor(tgt_indices)
 
-        return src_indices, tgt_indices
+        tgt_lang = self.tgt_text_preprocessor.lang2index(self.tgt_langs[idx])
+        tgt_lang = torch.Tensor(tgt_lang)
+        tgt_style = self.tgt_text_preprocessor.style2index(self.tgt_styles[idx])
+        tgt_style = torch.Tensor(tgt_style)
+
+        return src_indices, tgt_indices, tgt_lang, tgt_style
 
     @classmethod
     def create(
             cls,
-            source_path: Union[str, Path],
+            source_paths: List[Union[str, Path]],
             source_text_preprocessor: TextPreprocessor,
-            target_path: Union[str, Path],
+            target_paths: List[Union[str, Path]],
             target_text_preprocessor: TextPreprocessor,
+            target_langs: List[str],
+            target_styles: List[str],
     ) -> 'Seq2SeqDataset':
         '''
         create seq2seq dataset from text paths
 
-        :param source_path: path to source sentences
-        :param target_path: path to target sentences
+        :param source_paths: list of paths to source sentences
+        :param target_paths: list of paths to target sentences
         :param source_text_preprocessor: source text preprocessor
         :param target_text_preprocessor: target text preprocessor
+        :param target_langs: target langauges from source sentences to be translated.
+        :param target_styles: target styles from source sentences to be translated.
+
+        NOTE
+        ----
+        The format of target_langs and target_styles are like below tihs.
+        [<target_style1>, <target_style2>, <target_style_3>]
+        [<target_lang1>, <target_lang2>, <target_lang3>]
         '''
-        if isinstance(source_path, str):
-            source_path = Path(source_path)
-        if isinstance(target_path, str):
-            target_path = Path(target_path)
-        assert source_path.exists()
-        assert target_path.exists()
-        with source_path.open() as f:
-            source_text_list = [text.strip().lower() for text in f.readlines()]
+        assert len(source_paths) == len(target_paths)
+        assert len(source_paths) == len(target_langs)
+        assert len(source_paths) == len(target_styles)
 
-        with target_path.open() as f:
-            target_text_list = [text.strip().lower() for text in f.readlines()]
+        for idx in range(len(source_paths)):
+            if isinstance(source_paths[idx], str):
+                source_paths[idx] = Path(source_paths[idx])
+            if isinstance(target_paths[idx], str):
+                target_paths[idx] = Path(target_paths[idx])
+            assert source_paths[idx].exists()
+            assert target_paths[idx].exists()
 
-        assert len(source_text_list) == len(target_text_list)
+        source_text_list = []
+        target_text_list = []
+        languages = []
+        styles = []
+
+        for source_path, target_path, lang, style in zip(source_paths, target_paths, target_langs, target_styles):
+            with source_path.open() as f:
+                source_sub_text_list = [text.strip().lower() for text in f.readlines()]
+                source_text_list += source_sub_text_list
+
+            with target_path.open() as f:
+                target_sub_text_list = [text.strip().lower() for text in f.readlines()]
+                target_text_list += target_sub_text_list
+
+            # append target language and style for num-sentence times.
+            languages += [lang]*len(source_sub_text_list)
+            styles += [style]*len(source_sub_text_list)
+
+            assert len(source_text_list) == len(target_text_list)
+            assert len(source_text_list) == len(languages)
+            assert len(source_text_list) == len(styles)
+
 
         return cls(
             source_text_list,
             source_text_preprocessor,
             target_text_list,
             target_text_preprocessor,
+            languages,
+            styles,
         )
 
 
@@ -99,10 +150,12 @@ class Seq2seqDataLoader(BaseDataLoader):
     '''
     def __init__(
             self,
-            src_path: Union[str, Path],
+            src_paths: Sequence[Union[str, Path]],
             src_preprocessor_path: Union[str, Path],
-            tgt_path: Union[str, Path],
+            tgt_paths: Sequence[Union[str, Path]],
             tgt_preprocessor_path: Union[str, Path],
+            tgt_languages: Sequence[str],
+            tgt_styles: Sequence[str],
             batch_size: int=1,
             shuffle: bool=True,
             validation_split: float=0.0,
@@ -112,39 +165,50 @@ class Seq2seqDataLoader(BaseDataLoader):
         '''
         DataLoader for seq2seq data
 
-        :param source_path: path to source sentences
-        :param target_path: path to target sentences
-        :param source_text_preprocessor: source text preprocessor
-        :param target_text_preprocessor: target text preprocessor
+        :param src_path: list of paths to source sentences
+        :param tgt_path: list of paths to target sentences
+        :param src_text_preprocessor: source text preprocessor
+        :param tgt_text_preprocessor: target text preprocessor
+        :param tgt_languages: list of languages to be translated from source sentences.
+        :param tgt_styles: list of styles to be translated from source sentences.
         :param batch_size: batch size
         :param shuffle: shuffle data
         :param validation_split: split dataset for validation
         :param num_workers: the number of workers
         '''
-        if isinstance(src_path, str):
-            src_path = Path(src_path)
-        if isinstance(tgt_path, str):
-            tgt_path = Path(tgt_path)
+        assert len(src_paths) == len(tgt_paths)
+        assert len(src_paths) == len(tgt_languages)
+        assert len(src_paths) == len(tgt_styles)
+
+        for idx in range(len(src_paths)):
+            if isinstance(src_paths[idx], str):
+                src_paths[idx] = Path(src_paths[idx])
+            if isinstance(tgt_paths[idx], str):
+                tgt_paths[idx] = Path(tgt_paths[idx])
+            assert src_paths[idx].exists()
+            assert tgt_paths[idx].exists()
+
         if isinstance(src_preprocessor_path, str):
             src_preprocessor_path = Path(src_preprocessor_path)
         if isinstance(tgt_preprocessor_path, str):
             tgt_preprocessor_path = Path(tgt_preprocessor_path)
-        assert src_path.exists()
-        assert tgt_path.exists()
         assert src_preprocessor_path.exists()
         assert tgt_preprocessor_path.exists()
-        self.src_path = src_path
-        self.tgt_path = tgt_path
+
+        self.src_paths = src_paths
+        self.tgt_paths = tgt_paths
         self.src_preprocessor_path = src_preprocessor_path
         self.tgt_preprocessor_path = tgt_preprocessor_path
         self.src_text_preprocessor = TextPreprocessor.load(src_preprocessor_path)
         self.tgt_text_preprocessor = TextPreprocessor.load(tgt_preprocessor_path)
 
         self.dataset = Seq2SeqDataset.create(
-            src_path,
+            src_paths,
             self.src_text_preprocessor,
-            tgt_path,
+            tgt_paths,
             self.tgt_text_preprocessor,
+            tgt_languages,
+            tgt_styles,
         )
 
         super(Seq2seqDataLoader, self).__init__(

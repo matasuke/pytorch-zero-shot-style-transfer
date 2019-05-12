@@ -54,11 +54,13 @@ class Translator(object):
             self,
             src_batch: torch.Tensor,
             tgt_batch: Union[torch.Tensor, None],
+            tgt_lang: torch.Tensor,
+            tgt_style: torch.Tensor,
             lengths: List[int],
     ):
         batch_size = src_batch.size(1)
         #  (1) run the encoder on the src
-        encStates, context = self.model.encoder(src_batch, lengths)
+        encStates, context = self.model.encoder(src_batch, tgt_lang, tgt_style, lengths)
 
         rnnSize = context.size(2)
 
@@ -189,12 +191,14 @@ class Translator(object):
             self,
             src_batch: torch.Tensor,
             tgt_batch: Union[torch.Tensor, None],
+            tgt_lang: torch.Tensor,
+            tgt_style: torch.Tensor,
             lengths: List[int],
             indices: List[int],
     ) -> Tuple[List, List, List]:
         #  (2) translate
         pred, pred_score, attn, gold_score = \
-            self.translateBatch(src_batch, tgt_batch, lengths)
+            self.translateBatch(src_batch, tgt_batch, tgt_lang, tgt_style, lengths)
         pred, pred_score, attn, gold_score = \
             list(zip(*sorted(zip(pred, pred_score, attn, gold_score, indices), key=lambda x: x[-1])))[:-1]
 

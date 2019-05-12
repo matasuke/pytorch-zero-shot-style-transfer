@@ -11,12 +11,12 @@ from config_parser import ConfigParser
 
 def main(config: ConfigParser, resume: str):
     # setup data_loader instances
-    data_loader = getattr(module_data, config['data_loader']['type'])(
-        src_path=config['data_loader']['args']['test_src_path'],
-        tgt_path=config['data_loader']['args']['test_tgt_path'],
-        src_preprocessor_path=config['data_loader']['args']['src_preprocessor_path'],
-        tgt_preprocessor_path=config['data_loader']['args']['tgt_preprocessor_path'],
-        batch_size=config['data_loader']['args']['batch_size'],
+    data_loader = getattr(module_data, config['test_data_loader']['type'])(
+        src_path=config['test_data_loader']['args']['src_path'],
+        tgt_path=config['test_data_loader']['args']['tgt_path'],
+        src_preprocessor_path=config['test_data_loader']['args']['src_preprocessor_path'],
+        tgt_preprocessor_path=config['test_data_loader']['args']['tgt_preprocessor_path'],
+        batch_size=config['test_data_loader']['args']['batch_size'],
         shuffle=False,
         validation_split=0.0,
         num_workers=1,
@@ -30,7 +30,7 @@ def main(config: ConfigParser, resume: str):
     print(f'Loading checkpoint: {resume}')
     checkpoint = torch.load(resume)
     state_dict = checkpoint['state_dict']
-    if config['n_gpu'] > 1:
+    if config['n_gpu'] > 1 and len(config.device) > 1:
         model = torch.nn.DataParallel(model)
     model.load_state_dict(state_dict)
 
@@ -50,9 +50,11 @@ def main(config: ConfigParser, resume: str):
     out_f = (config.test_dir / config['translator']['output']).open('w')
 
     with torch.no_grad():
-        for batch_idx, (src, tgt, lengths, indices) in enumerate(tqdm(data_loader)):
+        for batch_idx, (src, tgt, tgt_lang, tgt_style, lengths, indices) in enumerate(tqdm(data_loader)):
             src, tgt = src.to(device), tgt.to(device)
-            pred_batch, _, _ = translator.translate(src, None, lengths, indices)
+            tgt_lang, tgt_style = tgt_lang.to(device), tgt_style.to(device)
+
+            pred_batch, _, _ = translator.translate(src, None, tgt_lang, tgt_style, lengths, indices)
 
             for b in range(len(pred_batch)):
                 out_f.write(' '.join(pred_batch[b][0]) + '\n')

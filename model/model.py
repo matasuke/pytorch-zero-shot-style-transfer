@@ -11,8 +11,12 @@ from .global_attention import GlobalAttention
 
 class Encoder(nn.Module):
     __slot__ = [
-        'emb_dim',
+        'vocab_emb_dim',
+        'lang_emb_dim',
+        'style_emb_dim',
         'vocab_size',
+        'num_lang',
+        'num_style',
         'num_layers',
         'dropout_ratio',
         'num_directions',
@@ -23,8 +27,12 @@ class Encoder(nn.Module):
 
     def __init__(
             self,
-            emb_dim: int,
+            vocab_emb_dim: int,
+            lang_emb_dim: int,
+            style_emb_dim: int,
             vocab_size: int,
+            num_lang: int,
+            num_style: int,
             hidden_dim: int,
             num_layers: int,
             brnn: bool=True,
@@ -33,29 +41,47 @@ class Encoder(nn.Module):
         '''
         seq2seq encoder
 
-        :param emb_dim: dimention of embedding layer
+        :param main_emb_dim: dimention of main embedding layer
+        :param lang_emb_dim: dimention of language embedding layer
+        :param style_emb_dim: dimention of style embedding layer
         :param vocab_size: vocabulary size
+        :param num_lang: the number of languages.
+        :param num_style: the number of styles.
         :param hidden_dim: hidden dimention
         :param num_layers: the number of layers
         :param brnn: use bidirectional LSTM
         :param dropout_ratio: dropout ratio
         '''
         super(Encoder, self).__init__()
-        self.emb_dim = emb_dim
+        self.vocab_emb_dim = vocab_emb_dim
+        self.lang_emb_dim = lang_emb_dim
+        self.style_emb_dim = style_emb_dim
+        self.main_emb_dim = vocab_emb_dim + lang_emb_dim + style_emb_dim
         self.vocab_size = vocab_size
+        self.num_lang = num_lang
+        self.num_style = num_style
+
         self.num_layers = num_layers
         self.dropout_ratio = dropout_ratio
         self.num_directions = 2 if brnn else 1
         assert hidden_dim % self.num_directions == 0
         self.hidden_dim = hidden_dim // self.num_directions
 
-        self.embedding = nn.Embedding(
+        self.vocab_embedding = nn.Embedding(
             self.vocab_size,
-            self.emb_dim,
+            self.main_emb_dim,
             padding_idx=TextPreprocessor.PAD_ID,
         )
+        self.lang_embedding = nn.Embedding(
+            self.num_lang,
+            self.lang_emb_dim,
+        )
+        self.style_embedding = nn.Embedding(
+            self.num_style,
+            self.style_emd_dim,
+        )
         self.lstm = nn.LSTM(
-            self.emb_dim,
+            self.main_emb_dim,
             self.hidden_dim,
             num_layers=self.num_layers,
             dropout=self.dropout_ratio,
@@ -64,14 +90,14 @@ class Encoder(nn.Module):
 
     def load_embedding(self, emb_path: Union[str, Path]):
         '''
-        Load pretrained embedding.
+        Load pretrained vocaburaly embedding.
         '''
         if isinstance(emb_path, str):
             emb_path = Path(emb_path)
         assert emb_path.exists()
 
         pretrained = torch.load(emb_path.as_posix())
-        self.embedding.weight.data.copy_(pretrained)
+        self.vocab_embedding.weight.data.copy_(pretrained)
 
     def init_hidden_state(self):
         return torch.zeros(2, self.hidden_size)
@@ -79,6 +105,8 @@ class Encoder(nn.Module):
     def forward(
             self,
             rnn_inputs: torch.Tensor,
+            language: torch.Tensor,
+            style: torch.Tensor,
             lengths: List[int],
             hidden_states: Optional[torch.Tensor]=None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -86,9 +114,15 @@ class Encoder(nn.Module):
         forward pass for Encoder
 
         :param rnn_inputs: tensors of padded tokens size of [batch_size, max_len]
+        :param language: language
+        :param style: style
         :param hidden_state: hidden state to initialize LSTM state.
         '''
-        embedded = self.embedding(rnn_inputs)
+        vocab_embedded = self.vocab_embedding(rnn_inputs)
+        lang_embedded = self.lang_embedding(language)
+        style_embedded = self.style_embedding(style)
+        embedded = torch.cat([vocab_embedded, lang_embedded, style_embedded], -1)
+
         embedded = pack_padded_sequence(embedded, lengths)
         outputs, hidden_states = self.lstm(embedded, hidden_states)
         outputs, _ = pad_packed_sequence(outputs)
@@ -232,8 +266,12 @@ class Model(nn.Module):
     '''
     def __init__(
             self,
-            emb_dim: int,
+            vocab_emb_dim: int,
+            lang_emb_dim: int,
+            style_emb_dim: int,
             in_vocab_size: int,
+            num_lang: int,
+            num_style: int,
             out_vocab_size: int,
             hidden_dim: int,
             num_layers: int=3,
@@ -243,15 +281,19 @@ class Model(nn.Module):
     ):
         super(Model, self).__init__()
         self.encoder = Encoder(
-            emb_dim,
+            vocab_emb_dim,
+            lang_emb_dim,
+            style_emb_dim.
             in_vocab_size,
+            num_lang,
+            num_style,
             hidden_dim,
             num_layers,
             brnn,
             dropout_ratio,
         )
         self.decoder = Decoder(
-            emb_dim,
+            vocab_emb_dim,
             out_vocab_size,
             hidden_dim,
             num_layers,

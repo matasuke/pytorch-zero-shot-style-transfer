@@ -35,11 +35,17 @@ class TextPreprocessor:
             self,
             token2index: Mapping[str, int],
             index2token: Mapping[int, str],
+            lang2index: Optional[Mapping[str, int]]=None,
+            style2index: Optional[Mapping[str, int]]=None,
             embed_matrix: Optional[np.ndarray]=None,
     ) -> None:
         self._token2index = token2index
         self._index2token = index2token
+        self._lang2index = lang2index
+        self._style2index = style2index
         self._vocab_size = len(self._token2index)
+        self._num_languages = len(self._lang2index)
+        self._num_styles = len(self._style2index)
         self._embed_matrix = embed_matrix
 
     @property
@@ -53,17 +59,25 @@ class TextPreprocessor:
 
     @property
     def vocab_size(self) -> int:
-        '''
-        get vocabulary size.
-
-        :return: vocabulary size.
-        '''
+        'get vocabulary size.'
         return self._vocab_size
+
+    @property
+    def num_languages(self) -> int:
+        'get the number of languages'
+        return self._num_languages
+
+    @property
+    def num_styles(self) -> int:
+        'get the number o styles'
+        return self._num_styles
 
     @classmethod
     def create(  # type: ignore
             cls,
             text_list: Sequence[str],
+            languages: Optional[Sequence[str]]=None,
+            styles: Optional[Sequence[str]]=None,
             max_vocab_size: Optional[int]=None,
             symbol_order: Optional[str]=None,
             train_embed_matrix: bool=False,
@@ -75,6 +89,8 @@ class TextPreprocessor:
         all text has to be pre-tokenized.
 
         :param text_list: list of sentences.
+        :param languages: list of languages.
+        :param styles: list of styles.
         :param max_vocab_size: maximum vocabulary size.
         :param symbol_order: the order of special symbols.
         :param train_embed_matrix: train embed matrix or not. it consumes much time.
@@ -99,6 +115,13 @@ class TextPreprocessor:
         token2index = dict(zip(token_list, range(len(token_list))))
         index2token = dict({index: token for token, index in token2index.items()})
 
+        if languages is not None and styles is not None:
+            lang2index = dict(zip(languages, range(len(languages))))
+            style2index = dict(zip(styles, range(len(styles))))
+        else:
+            lang2index = None
+            style2index = None
+
         embed_matrix = None
         if train_embed_matrix:
             embed_matrix = cls.create_embed_matrix(
@@ -108,7 +131,7 @@ class TextPreprocessor:
                 window_size=window_size,
             )
 
-        return cls(token2index, index2token, embed_matrix)
+        return cls(token2index, index2token, lang2index, style2index, embed_matrix)
 
     @classmethod
     def load(cls, path: Union[str, Path]) -> 'TextPreprocessor':
@@ -123,9 +146,15 @@ class TextPreprocessor:
         assert path.exists()
 
         with path.open('rb') as f:
-            token2index, index2token, embed_matrix = pickle.loads(f.read())
+            token2index, index2token, lang2index, style2index, embed_matrix = pickle.loads(f.read())
 
-        return cls(token2index, index2token, embed_matrix)
+        return cls(
+            token2index,
+            index2token,
+            lang2index,
+            style2index,
+            embed_matrix
+        )
 
     def save(self, path: Union[str, Path]) -> None:
         '''
@@ -139,7 +168,13 @@ class TextPreprocessor:
         if not path.parent.exists():
             path.parent.mkdir(parents=True)
         with path.open('wb') as f:
-            pickle.dump((self._token2index, self._index2token, self._embed_matrix), f)
+            pickle.dump((
+                self._token2index,
+                self._index2token,
+                self._lang2index,
+                self._style2index,
+                self._embed_matrix
+            ), f)
 
     def token2index(self, token: str) -> int:
         '''
@@ -189,6 +224,14 @@ class TextPreprocessor:
         tokens = list(self.index2token(index) for index in indice)
 
         return tokens
+
+    def lang2index(self, token: int):
+        'get index of language'
+        return self._lang2index[token]
+
+    def style2index(self, token: int):
+        'get index of style'
+        return self._style2index[token]
 
     @classmethod
     def create_embed_matrix(
@@ -244,37 +287,58 @@ class TextPreprocessor:
 
 if __name__ == '__main__':
     parser = ArgumentParser('create dataset for seq2seq model')
-    parser.add_argument('-data_path', type=str, required=True,
-                        help='path to text dataset, which are pre-processed')
-    parser.add_argument('-save_path', type=str, required=True,
+    parser.add_argument('--data_paths', type=str, nargs='+', required=True,
+                        help='list of path to text dataset, which are pre-processed')
+    parser.add_argument('--languages', type=str, default=[], nargs='+',
+                        help='list of languages')
+    parser.add_argument('--styles', type=str, default=[], nargs='+',
+                        help='list of styles')
+    parser.add_argument('--save_path', type=str, required=True,
                         help='path to save path')
-    parser.add_argument('-max_vocab_size', type=int, default=0,
+    parser.add_argument('--max_vocab_size', type=int, default=0,
                         help='maximum vocaburaly size. all vocaburaly is used when 0')
-    parser.add_argument('-train_embed_matrix', action='store_true',
+    parser.add_argument('--train_embed_matrix', action='store_true',
                         help='train embed matrix')
-    parser.add_argument('-dim_size', type=int, default=512,
+    parser.add_argument('--dim_size', type=int, default=512,
                         help='dimension of word embedding')
-    parser.add_argument('-window_size', type=int, default=5,
+    parser.add_argument('--window_size', type=int, default=5,
                         help='window size used for word2vec')
     args = parser.parse_args()
 
-    data_path = Path(args.data_path)
-    save_path = Path(args.save_path)
-    assert data_path.exists()
+    data_paths = []
+    for data_path in args.data_paths:
+        data_path = Path(data_path)
+        data_paths.append(data_path)
+        assert data_path.exists()
 
+    save_path = Path(args.save_path)
     if not save_path.parent.exists():
         save_path.parent.mkdir(parents=True)
 
     print('Loading text...')
-    with data_path.open() as f:
-        sentences = [sentence.strip() for sentence in f.readlines()]
+    sentences = []
+    for data_path in data_paths:
+        with data_path.open() as f:
+            sentences += [sentence.strip() for sentence in f.readlines()]
     print(f'text size: {len(sentences)}')
+
+    if len(args.languages) and len(args.styles):
+        languages = args.languages
+        styles = args.styles
+        print(f'num languages: {len(args.languages)}')
+        print(f'num styles: {len(args.styles)}')
+    else:
+        print('No target languages and styles are specified.')
+        languages = None
+        styles = None
 
     max_vocab_size = args.max_vocab_size if args.max_vocab_size > 0 else None
 
     print('Creating vocaburaly...')
     text_preprocessor = TextPreprocessor.create(
         text_list=sentences,
+        languages=args.languages,
+        styles=args.styles,
         max_vocab_size=max_vocab_size,
         train_embed_matrix=args.train_embed_matrix,
         dim_size=args.dim_size,

@@ -72,11 +72,12 @@ class Trainer(BaseTrainer):
 
         total_loss, total_ppl = 0, 0
         total_metrics = np.zeros(len(self.metrics))
-        for batch_idx, (src, tgt, lengths, _) in enumerate(self.data_loader):
+        for batch_idx, (src, tgt, tgt_lang, tgt_style, lengths, _) in enumerate(self.data_loader):
             src, tgt = src.to(self.device), tgt.to(self.device)
+            tgt_lang, tgt_style = tgt_lang.to(self.device), tgt_style.to(self.device)
 
             self.model.zero_grad()
-            output = self.model(src, tgt[:-1], lengths)  # exclude last target from inputs
+            output = self.model(src, tgt[:-1], tgt_lang, tgt_style, lengths)  # exclude last target from inputs
             loss = self.loss(output, tgt[1:].view(-1))  # exclude <SOS> from targets
             loss.backward()
             self.optimizer.step()
@@ -127,10 +128,11 @@ class Trainer(BaseTrainer):
         total_val_loss, total_val_ppl = 0, 0
         total_val_metrics = np.zeros(len(self.metrics))
         with torch.no_grad():
-            for batch_idx, (src, tgt, lengths, _) in enumerate(self.data_loader):
+            for batch_idx, (src, tgt, tgt_lang, tgt_style, lengths, _) in enumerate(self.data_loader):
                 src, tgt = src.to(self.device), tgt.to(self.device)
+                tgt_lang, tgt_style = tgt_lang.to(self.device), tgt_style.to(self.device)
 
-                output = self.model(src, tgt[:-1], lengths)  # exclude last target from inputs
+                output = self.model(src, tgt[:-1], tgt_lang, tgt_style, lengths)  # exclude last target from inputs
                 loss = self.loss(output, tgt[1:].view(-1))  # exclude <SOS> from targets
 
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
