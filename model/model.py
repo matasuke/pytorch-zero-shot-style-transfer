@@ -84,6 +84,7 @@ class Encoder(nn.Module):
             self.main_emb_dim,
             self.hidden_dim,
             num_layers=self.num_layers,
+            batch_first=False,
             dropout=self.dropout_ratio,
             bidirectional=brnn,
         )
@@ -123,10 +124,14 @@ class Encoder(nn.Module):
         style_embedded = self.style_embedding(style)
 
         embedded = torch.cat([vocab_embedded, lang_embedded, style_embedded], -1)
-        embedded = pack_padded_sequence(embedded, lengths)
-        outputs, hidden_states = self.lstm(embedded, hidden_states)
-        outputs, _ = pad_packed_sequence(outputs)
 
+        lengths = lengths.squeeze(0).tolist()
+        # get max_seq_len to use pad_packed sequence for dataparallel
+        total_length = embedded.size(0)
+
+        embedded = pack_padded_sequence(embedded, lengths, batch_first=False)
+        outputs, hidden_states = self.lstm(embedded, hidden_states)
+        outputs, _ = pad_packed_sequence(outputs, total_length=total_length)
         return hidden_states, outputs
 
 
@@ -292,8 +297,9 @@ class Model(nn.Module):
             brnn,
             dropout_ratio,
         )
+        self.emb_dim_total = vocab_emb_dim + lang_emb_dim + style_emb_dim
         self.decoder = Decoder(
-            vocab_emb_dim,
+            self.emb_dim_total,
             out_vocab_size,
             hidden_dim,
             num_layers,
@@ -332,5 +338,8 @@ class Model(nn.Module):
         out, dec_hidden, _attn = self.decoder(targets, enc_hidden, context, init_output)
 
         out = self.generator(out.view(-1, out.size(2)))
+        # [batch_size, out_vocab_size] -> [1, batch_size, out_vocab_size]
+        # this is for DataParallel option with dim=1
+        out = out.unsqueeze(0)
 
         return out
