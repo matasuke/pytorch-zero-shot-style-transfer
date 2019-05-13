@@ -28,6 +28,7 @@ def seq2seq_collate_fn(
             end = lengths[idx]
             padded_seqs[idx, :end] = sen[:end]
 
+        lengths = torch.LongTensor([lengths])
         padded_seqs = padded_seqs.t().contiguous()
 
         return padded_seqs, lengths
