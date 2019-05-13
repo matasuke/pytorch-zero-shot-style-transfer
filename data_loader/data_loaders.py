@@ -176,8 +176,8 @@ class Seq2seqDataLoader(BaseDataLoader):
                 src_paths[idx] = Path(src_paths[idx])
             if isinstance(tgt_paths[idx], str):
                 tgt_paths[idx] = Path(tgt_paths[idx])
-            assert src_paths[idx].exists()
-            assert tgt_paths[idx].exists()
+            assert src_paths[idx].exists(), src_paths[idx].as_posix()
+            assert tgt_paths[idx].exists(), tgt_paths[idx].as_posix()
 
         if isinstance(text_preprocessor_path, str):
             text_preprocessor_path = Path(text_preprocessor_path)

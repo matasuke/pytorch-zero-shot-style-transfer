@@ -76,8 +76,6 @@ class Trainer(BaseTrainer):
             src, tgt = src.to(self.device), tgt.to(self.device)
             lengths = lengths.to(self.device)
             tgt_lang, tgt_style = tgt_lang.to(self.device), tgt_style.to(self.device)
-            if src.size(0) > 50:
-                continue
             self.model.zero_grad()
             output = self.model(src, tgt[:-1], tgt_lang, tgt_style, lengths)  # exclude last target from inputs
             # [1, batch_size, out_vocab_size] > [batch_size, out_vocab_size]
@@ -136,9 +134,13 @@ class Trainer(BaseTrainer):
         with torch.no_grad():
             for batch_idx, (src, tgt, tgt_lang, tgt_style, lengths, _) in enumerate(self.data_loader):
                 src, tgt = src.to(self.device), tgt.to(self.device)
+                lengths = lengths.to(self.device)
                 tgt_lang, tgt_style = tgt_lang.to(self.device), tgt_style.to(self.device)
 
                 output = self.model(src, tgt[:-1], tgt_lang, tgt_style, lengths)  # exclude last target from inputs
+                # [1, batch_size, out_vocab_size] > [batch_size, out_vocab_size]
+                # this is for DataParallel option with dim=1
+                output = output.squeeze(0)
                 loss = self.loss(output, tgt[1:].view(-1))  # exclude <SOS> from targets
 
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')

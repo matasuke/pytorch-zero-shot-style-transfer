@@ -309,7 +309,7 @@ if __name__ == '__main__':
     for data_path in args.data_paths:
         data_path = Path(data_path)
         data_paths.append(data_path)
-        assert data_path.exists()
+        assert data_path.exists(), data_path.as_posix()
 
     save_path = Path(args.save_path)
     if not save_path.parent.exists():
