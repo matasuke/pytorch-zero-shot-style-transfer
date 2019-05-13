@@ -42,4 +42,9 @@ def seq2seq_collate_fn(
     src, lengths = merge(src)
     tgt, _ = merge(tgt)
 
+    # tgt_lang and tgt_style: [seq_len, batch_size, lang_dim], [seq_len, batch_size, style_dim]
+    # embedding of lang and style are concatenated to vocab_dim
+    tgt_lang = torch.stack([torch.stack(tgt_lang, -1) for _ in range(0, src.size(0))]).squeeze(1)
+    tgt_style = torch.stack([torch.stack(tgt_style, -1) for _ in range(0, src.size(0))]).squeeze(1)
+
     return src, tgt, tgt_lang, tgt_style, lengths, indices

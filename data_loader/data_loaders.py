@@ -55,17 +55,18 @@ class Seq2SeqDataset(Dataset):
 
     def __getitem__(self, idx: int) -> torch.Tensor:
         src_tokens = self.src_list[idx].split()
-        src_indices = self.src_text_preprocessor.tokens2indice(src_tokens, sos=False, eos=False)
+        src_indices = self.text_preprocessor.tokens2indice(src_tokens, sos=False, eos=False)
         src_indices = torch.Tensor(src_indices)
 
         tgt_tokens = self.tgt_list[idx].split()
-        tgt_indices = self.tgt_text_preprocessor.tokens2indice(tgt_tokens, sos=True, eos=True)
+        tgt_indices = self.text_preprocessor.tokens2indice(tgt_tokens, sos=True, eos=True)
         tgt_indices = torch.Tensor(tgt_indices)
 
-        tgt_lang = self.tgt_text_preprocessor.lang2index(self.tgt_langs[idx])
-        tgt_lang = torch.Tensor(tgt_lang)
-        tgt_style = self.tgt_text_preprocessor.style2index(self.tgt_styles[idx])
-        tgt_style = torch.Tensor(tgt_style)
+
+        tgt_lang = self.text_preprocessor.lang2index(self.tgt_langs[idx])
+        tgt_lang = torch.LongTensor([tgt_lang])
+        tgt_style = self.text_preprocessor.style2index(self.tgt_styles[idx])
+        tgt_style = torch.LongTensor([tgt_style])
 
         return src_indices, tgt_indices, tgt_lang, tgt_style
 

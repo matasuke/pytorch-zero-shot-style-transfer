@@ -69,7 +69,7 @@ class Encoder(nn.Module):
 
         self.vocab_embedding = nn.Embedding(
             self.vocab_size,
-            self.main_emb_dim,
+            self.vocab_emb_dim,
             padding_idx=TextPreprocessor.PAD_ID,
         )
         self.lang_embedding = nn.Embedding(
@@ -78,7 +78,7 @@ class Encoder(nn.Module):
         )
         self.style_embedding = nn.Embedding(
             self.num_style,
-            self.style_emd_dim,
+            self.style_emb_dim,
         )
         self.lstm = nn.LSTM(
             self.main_emb_dim,
@@ -121,8 +121,8 @@ class Encoder(nn.Module):
         vocab_embedded = self.vocab_embedding(rnn_inputs)
         lang_embedded = self.lang_embedding(language)
         style_embedded = self.style_embedding(style)
-        embedded = torch.cat([vocab_embedded, lang_embedded, style_embedded], -1)
 
+        embedded = torch.cat([vocab_embedded, lang_embedded, style_embedded], -1)
         embedded = pack_padded_sequence(embedded, lengths)
         outputs, hidden_states = self.lstm(embedded, hidden_states)
         outputs, _ = pad_packed_sequence(outputs)
@@ -283,7 +283,7 @@ class Model(nn.Module):
         self.encoder = Encoder(
             vocab_emb_dim,
             lang_emb_dim,
-            style_emb_dim.
+            style_emb_dim,
             in_vocab_size,
             num_lang,
             num_style,
@@ -318,8 +318,14 @@ class Model(nn.Module):
         else:
             hidden_state
 
-    def forward(self, rnn_inputs: torch.Tensor, targets: torch.Tensor, lengths: List[int]):
-        enc_hidden, context = self.encoder(rnn_inputs, lengths)
+    def forward(
+            self,
+            rnn_inputs: torch.Tensor,
+            targets: torch.Tensor,
+            tgt_lang: torch.Tensor,
+            tgt_style: torch.Tensor,
+            lengths: List[int]):
+        enc_hidden, context = self.encoder(rnn_inputs, tgt_lang, tgt_style, lengths)
         init_output = self.make_init_decoder_output(context)
 
         enc_hidden = (self._fix_enc_hidden(enc_hidden[0]), self._fix_enc_hidden(enc_hidden[1]))
