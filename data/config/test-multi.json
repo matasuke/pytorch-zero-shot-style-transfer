@@ -54,7 +54,7 @@
                     "<2OST>","<2SI>","<2SI>","<2TED>","<2TED>"
             ],
             "text_preprocessor_path": "data/corpora/sample-50000/preprocessor/ost-ted-si.32000.pkl",
-            "batch_size": 192,
+            "batch_size": 300,
             "shuffle": true,
             "validation_split": 0.1,
             "num_workers": 4
@@ -74,7 +74,7 @@
             "tgt_languages": ["<2JA>", "<2JA>"],
             "tgt_styles": ["<2SI>","<2SI>"],
             "text_preprocessor_path": "data/corpora/sample-50000/preprocessor/ost-ted-si.32000.pkl",
-            "batch_size": 192,
+            "batch_size": 300,
             "shuffle": false,
             "num_workers": 4
         }

@@ -173,6 +173,6 @@ class BaseTrainer:
             self.logger.warning("Warning: Optimizer type given in config file is different from that of checkpoint. "
                                 "Optimizer parameters not being resumed.")
         else:
-            self.optimizer.load_state_dict(checkpoint['optimizer'])
+            self.optimizer.optimizer.load_state_dict(checkpoint['optimizer'])
 
         self.logger.info("Checkpoint loaded. Resume training from epoch {}".format(self.start_epoch))
