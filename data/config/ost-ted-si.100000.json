@@ -1,6 +1,6 @@
 {
     "name": "zero-shot-style-transfer-sample-100000",
-    "n_gpu": 1,
+    "n_gpu": 2,
     "arch": {
         "type": "Model",
         "args": {
@@ -53,7 +53,7 @@
                     "<2OST>","<2OST>","<2OST>","<2OST>","<2OST>",
                     "<2OST>","<2SI>","<2SI>","<2TED>","<2TED>"
             ],
-            "text_preprocessor_path": "data/corpora/prorcessed/limit-50/sample-100000/tokenized/preprocessor/ost-ted-si.32000.pkl",
+            "text_preprocessor_path": "data/corpora/processed/limit-50/sample-100000/tokenized/preprocessor/ost-ted-si.32000.pkl",
             "batch_size": 128,
             "shuffle": true,
             "validation_split": 0.1,
@@ -73,7 +73,7 @@
             ],
             "tgt_languages": ["<2JA>", "<2JA>"],
             "tgt_styles": ["<2SI>","<2SI>"],
-            "text_preprocessor_path": "data/corpora/prorcessed/limit-50/sample-100000/tokenized/preprocessor/ost-ted-si.32000.pkl",
+            "text_preprocessor_path": "data/corpora/processed/limit-50/sample-100000/tokenized/preprocessor/ost-ted-si.32000.pkl",
             "batch_size": 128,
             "shuffle": false,
             "num_workers": 4
