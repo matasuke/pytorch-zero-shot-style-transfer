@@ -73,12 +73,14 @@ class Encoder(nn.Module):
             padding_idx=TextPreprocessor.PAD_ID,
         )
         self.lang_embedding = nn.Embedding(
-            self.num_lang,
+            self.num_lang + 1,  # for PAD_ID
             self.lang_emb_dim,
+            padding_idx=TextPreprocessor.PAD_ID,
         )
         self.style_embedding = nn.Embedding(
-            self.num_style,
+            self.num_style + 1,  # for PAD_ID
             self.style_emb_dim,
+            padding_idx=TextPreprocessor.PAD_ID,
         )
         self.lstm = nn.LSTM(
             self.main_emb_dim,
@@ -125,6 +127,8 @@ class Encoder(nn.Module):
 
         embedded = torch.cat([vocab_embedded, lang_embedded, style_embedded], -1)
 
+        # size of lengths is like [1, batch_size] for DataParallel(dim=1)
+        # so it has to be changed to [batch_size, ] to get correct length split size.
         lengths = lengths.squeeze(0).tolist()
         # get max_seq_len to use pad_packed sequence for dataparallel
         total_length = embedded.size(0)

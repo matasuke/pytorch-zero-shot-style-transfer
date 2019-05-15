@@ -17,7 +17,7 @@ def seq2seq_collate_fn(
     inputs contains batch o src sentences, tgt sentences, languages, styles like
     (source_sentences, target_sentences, target_languages, target_styles)
     '''
-    def merge(sentences: List[torch.Tensor]):
+    def merge_seq(sentences: List[torch.Tensor]):
         '''
         pad sequences for source
         '''
@@ -28,10 +28,27 @@ def seq2seq_collate_fn(
             end = lengths[idx]
             padded_seqs[idx, :end] = sen[:end]
 
-        lengths = torch.LongTensor([lengths])
         padded_seqs = padded_seqs.t().contiguous()
 
         return padded_seqs, lengths
+
+    def merge_features(
+            features: List[torch.Tensor],
+            lengths: List[int]
+    ) -> torch.Tensor:
+        '''
+        pad features like language and style
+        convert List[batch_size] -> [seq_len, batch_size]
+        '''
+        padded_feats = torch.zeros(len(features), max(lengths)).long()
+
+        for idx, feat in enumerate(features):
+            end = lengths[idx]
+            padded_feats[idx, :end] = feat
+
+        padded_feats = padded_feats.t().contiguous()
+
+        return padded_feats
 
     indices = list(range(len(inputs)))
 
@@ -40,12 +57,12 @@ def seq2seq_collate_fn(
         zip(*sorted(zip(inputs, indices), key=lambda x: len(x[0][0]), reverse=True))
     src, tgt, tgt_lang, tgt_style = zip(*src_tgt_pair)
 
-    src, lengths = merge(src)
-    tgt, _ = merge(tgt)
+    src, lengths = merge_seq(src)
+    tgt, _ = merge_seq(tgt)
 
-    # tgt_lang and tgt_style: [seq_len, batch_size, lang_dim], [seq_len, batch_size, style_dim]
-    # embedding of lang and style are concatenated to vocab_dim
-    tgt_lang = torch.stack([torch.stack(tgt_lang, -1) for _ in range(0, src.size(0))]).squeeze(1)
-    tgt_style = torch.stack([torch.stack(tgt_style, -1) for _ in range(0, src.size(0))]).squeeze(1)
+    tgt_lang = merge_features(tgt_lang, lengths)
+    tgt_style = merge_features(tgt_style, lengths)
+
+    lengths = torch.LongTensor([lengths])
 
     return src, tgt, tgt_lang, tgt_style, lengths, indices

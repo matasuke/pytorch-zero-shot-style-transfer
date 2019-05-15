@@ -13,8 +13,7 @@ class Translator(object):
     def __init__(
             self,
             model: Model,
-            src_preprocessor: TextPreprocessor,
-            tgt_preprocessor: TextPreprocessor,
+            text_preprocessor: TextPreprocessor,
             replace_unk: bool=True,
             beam_width: int=5,
             n_best: int=1,
@@ -30,8 +29,7 @@ class Translator(object):
         else:
             self.tt = torch
 
-        self.src_preprocessor = src_preprocessor
-        self.tgt_preprocessor = tgt_preprocessor
+        self.text_preprocessor = text_preprocessor
 
         if torch.cuda.is_available():
             model = model.cuda()
@@ -42,7 +40,7 @@ class Translator(object):
         self.model.eval()
 
     def buildTargetTokens(self, pred, src, attn):
-        tokens = self.tgt_preprocessor.indice2tokens(pred, stop_eos=True)
+        tokens = self.text_preprocessor.indice2tokens(pred, stop_eos=True)
         if self.replace_unk:
             for i in range(len(tokens)):
                 if tokens[i] == TextPreprocessor.UNK_ID:

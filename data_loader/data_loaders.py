@@ -47,8 +47,12 @@ class Seq2SeqDataset(Dataset):
         assert len(src_list) == len(tgt_list)
         assert len(src_list) == len(tgt_langs)
         assert len(src_list) == len(tgt_styles)
-        assert text_preprocessor.num_languages == len(set(tgt_langs))
-        assert text_preprocessor.num_styles == len(set(tgt_styles))
+        assert len(set(tgt_langs)) <= text_preprocessor.num_languages
+        assert len(set(tgt_styles)) <= text_preprocessor.num_styles
+        for tgt_lang in tgt_langs:
+            assert tgt_lang in text_preprocessor._lang2index
+        for tgt_style in tgt_styles:
+            assert tgt_style in text_preprocessor._style2index
 
     def __len__(self):
         return len(self.src_list)
@@ -56,19 +60,21 @@ class Seq2SeqDataset(Dataset):
     def __getitem__(self, idx: int) -> torch.Tensor:
         src_tokens = self.src_list[idx].split()
         src_indices = self.text_preprocessor.tokens2indice(src_tokens, sos=False, eos=False)
-        src_indices = torch.Tensor(src_indices)
+        src_indices = torch.LongTensor(src_indices)
 
         tgt_tokens = self.tgt_list[idx].split()
         tgt_indices = self.text_preprocessor.tokens2indice(tgt_tokens, sos=True, eos=True)
-        tgt_indices = torch.Tensor(tgt_indices)
+        tgt_indices = torch.LongTensor(tgt_indices)
 
+        tgt_lang_tokens = self.tgt_langs[idx]
+        tgt_lang_index = self.text_preprocessor.lang2index(tgt_lang_tokens)
+        tgt_lang_index = torch.LongTensor([tgt_lang_index])
 
-        tgt_lang = self.text_preprocessor.lang2index(self.tgt_langs[idx])
-        tgt_lang = torch.LongTensor([tgt_lang])
-        tgt_style = self.text_preprocessor.style2index(self.tgt_styles[idx])
-        tgt_style = torch.LongTensor([tgt_style])
+        tgt_style_tokens = self.tgt_styles[idx]
+        tgt_style_index = self.text_preprocessor.style2index(tgt_style_tokens)
+        tgt_style_index = torch.LongTensor([tgt_style_index])
 
-        return src_indices, tgt_indices, tgt_lang, tgt_style
+        return src_indices, tgt_indices, tgt_lang_index, tgt_style_index
 
     @classmethod
     def create(

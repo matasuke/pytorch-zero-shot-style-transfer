@@ -35,8 +35,8 @@ class TextPreprocessor:
             self,
             token2index: Mapping[str, int],
             index2token: Mapping[int, str],
-            lang2index: Optional[Mapping[str, int]]=None,
-            style2index: Optional[Mapping[str, int]]=None,
+            lang2index: Optional[Mapping[str, int]],
+            style2index: Optional[Mapping[str, int]],
             embed_matrix: Optional[np.ndarray]=None,
     ) -> None:
         self._token2index = token2index
@@ -44,8 +44,8 @@ class TextPreprocessor:
         self._lang2index = lang2index
         self._style2index = style2index
         self._vocab_size = len(self._token2index)
-        self._num_languages = len(self._lang2index)
-        self._num_styles = len(self._style2index)
+        self._num_languages = len(self._lang2index)-1  # PAD_ID is added
+        self._num_styles = len(self._style2index)-1  # PAD_ID is added
         self._embed_matrix = embed_matrix
 
     @property
@@ -76,8 +76,8 @@ class TextPreprocessor:
     def create(  # type: ignore
             cls,
             text_list: Sequence[str],
-            languages: Optional[Sequence[str]]=None,
-            styles: Optional[Sequence[str]]=None,
+            languages: Optional[Sequence[str]],
+            styles: Optional[Sequence[str]],
             max_vocab_size: Optional[int]=None,
             symbol_order: Optional[str]=None,
             train_embed_matrix: bool=False,
@@ -115,12 +115,10 @@ class TextPreprocessor:
         token2index = dict(zip(token_list, range(len(token_list))))
         index2token = dict({index: token for token, index in token2index.items()})
 
-        if languages is not None and styles is not None:
-            lang2index = dict(zip(languages, range(len(languages))))
-            style2index = dict(zip(styles, range(len(styles))))
-        else:
-            lang2index = None
-            style2index = None
+        languages = [cls.PAD_SYMBOL] + list(languages)
+        styles = [cls.PAD_SYMBOL] + list(styles)
+        lang2index = dict(zip(languages, range(len(languages))))
+        style2index = dict(zip(styles, range(len(styles))))
 
         embed_matrix = None
         if train_embed_matrix:

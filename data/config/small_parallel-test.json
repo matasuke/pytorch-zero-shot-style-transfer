@@ -1,0 +1,102 @@
+{
+    "name": "small-parallel-test",
+    "n_gpu": 1,
+    "arch": {
+        "type": "Model",
+        "args": {
+             "vocab_emb_dim": 504,
+             "lang_emb_dim": 4,
+             "style_emb_dim": 4,
+             "in_vocab_size": 8000,
+             "num_lang": 2,
+             "num_style": 1,
+             "out_vocab_size": 8000,
+             "hidden_dim": 512,
+             "num_layers": 2,
+             "dropout_ratio": 0.3,
+             "brnn": true,
+             "input_feed": true
+        }
+    },
+    "train_data_loader": {
+        "type": "Seq2seqDataLoader",
+        "args":{
+            "src_paths": [
+                    "data/corpora/raw/small_parallel/train.en",
+                    "data/corpora/raw/small_parallel/train.ja"
+            ],
+            "tgt_paths": [
+                    "data/corpora/raw/small_parallel/train.ja",
+                    "data/corpora/raw/small_parallel/train.en"
+            ],
+            "tgt_languages": [
+                    "<2JA>","<2EN>"
+            ],
+            "tgt_styles": [
+                    "<2SMALL>", "<2SMALL>"
+            ],
+            "text_preprocessor_path": "data/preprocessor/small-parallel-8000.pkl",
+            "batch_size": 128,
+            "shuffle": true,
+            "validation_split": 0.1,
+            "num_workers": 4
+        }
+    },
+    "test_data_loader": {
+        "type": "Seq2seqDataLoader",
+        "args":{
+            "src_path": [
+                    "data/corpora/raw/small_parallel/train.en",
+                    "data/corpora/raw/small_parallel/train.ja"
+            ],
+            "tgt_path": [
+                    "data/corpora/raw/small_parallel/train.ja",
+                    "data/corpora/raw/small_parallel/train.en"
+            ],
+            "tgt_languages": [
+                    "<2JA>","<2EN>"
+            ],
+            "tgt_styles": [
+                    "<2SMALL>", "<2SMALL>"
+            ],
+            "text_preprocessor_path": "data/preprocessor/small-parallel-8000.pkl",
+            "batch_size": 128,
+            "shuffle": false,
+            "num_workers": 4
+        }
+    },
+    "optimizer": {
+        "type": "Optim",
+        "args":{
+            "method":"sgd",
+            "lr": 1,
+            "lr_decay": 0.5,
+            "max_grad_norm": 5,
+            "start_decay_at": 20
+        }
+    },
+    "translator": {
+        "type": "Translator",
+        "args":{
+            "replace_unk": true,
+            "beam_width": 5,
+            "n_best": 1,
+            "max_length": 50
+        },
+        "output": "output.txt"
+    },
+    "loss": "nll_loss",
+    "metrics": [
+        "my_metric", "my_metric2"
+    ],
+    "trainer": {
+        "epochs": 50,
+        "save_dir": "data/saved/",
+        "save_period": 1,
+        "verbosity": 2,
+        "monitor": "min val_loss",
+        "early_stop": 10,
+        "tensorboardX": true,
+        "log_dir": "data/saved/runs"
+    }
+}

@@ -12,10 +12,11 @@ from config_parser import ConfigParser
 def main(config: ConfigParser, resume: str):
     # setup data_loader instances
     data_loader = getattr(module_data, config['test_data_loader']['type'])(
-        src_path=config['test_data_loader']['args']['src_path'],
-        tgt_path=config['test_data_loader']['args']['tgt_path'],
-        src_preprocessor_path=config['test_data_loader']['args']['src_preprocessor_path'],
-        tgt_preprocessor_path=config['test_data_loader']['args']['tgt_preprocessor_path'],
+        src_paths=config['test_data_loader']['args']['src_path'],
+        tgt_paths=config['test_data_loader']['args']['tgt_path'],
+        tgt_languages=config['test_data_loader']['args']['tgt_languages'],
+        tgt_styles=config['test_data_loader']['args']['tgt_styles'],
+        text_preprocessor_path=config['test_data_loader']['args']['text_preprocessor_path'],
         batch_size=config['test_data_loader']['args']['batch_size'],
         shuffle=False,
         validation_split=0.0,
@@ -30,9 +31,12 @@ def main(config: ConfigParser, resume: str):
     print(f'Loading checkpoint: {resume}')
     checkpoint = torch.load(resume)
     state_dict = checkpoint['state_dict']
-    if config['n_gpu'] > 1 and len(config.device) > 1:
-        model = torch.nn.DataParallel(model)
+    if config['n_gpu'] > 1:
+        model = torch.nn.DataParallel(model, device_ids=config.device)
     model.load_state_dict(state_dict)
+
+    if config['n_gpu'] > 1:
+        model = model.module
 
     # prepare model for testing
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -41,8 +45,7 @@ def main(config: ConfigParser, resume: str):
 
     trans_args = {
         'model': model,
-        'src_preprocessor': data_loader.src_text_preprocessor,
-        'tgt_preprocessor': data_loader.tgt_text_preprocessor,
+        'text_preprocessor': data_loader.text_preprocessor,
     }
     translator = config.initialize('translator', module_translator, *trans_args.values())
 
