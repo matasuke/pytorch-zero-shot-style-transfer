@@ -1,12 +1,12 @@
 {
     "name": "zero-shot-style-transfer-sample-50000",
-    "n_gpu": 3,
+    "n_gpu": 1,
     "arch": {
         "type": "Model",
         "args": {
-             "vocab_emb_dim": 504,
-             "lang_emb_dim": 4,
-             "style_emb_dim": 4,
+             "vocab_emb_dim": 502,
+             "lang_emb_dim": 5,
+             "style_emb_dim": 5,
              "in_vocab_size": 32000,
              "num_lang": 3,
              "num_style": 3,
@@ -15,7 +15,7 @@
              "num_layers": 3,
              "dropout_ratio": 0.3,
              "brnn": true,
-             "input_feed": true
+             "input_feed": false
         }
     },
     "train_data_loader": {
@@ -54,7 +54,7 @@
                     "<2OST>","<2SI>","<2SI>","<2TED>","<2TED>"
             ],
             "text_preprocessor_path": "data/corpora/sample-50000/preprocessor/ost-ted-si.32000.pkl",
-            "batch_size": 300,
+            "batch_size": 128,
             "shuffle": true,
             "validation_split": 0.1,
             "num_workers": 4
@@ -74,7 +74,7 @@
             "tgt_languages": ["<2JA>", "<2JA>"],
             "tgt_styles": ["<2SI>","<2SI>"],
             "text_preprocessor_path": "data/corpora/sample-50000/preprocessor/ost-ted-si.32000.pkl",
-            "batch_size": 300,
+            "batch_size": 128,
             "shuffle": false,
             "num_workers": 4
         }
@@ -82,27 +82,25 @@
     "optimizer": {
         "type": "Optim",
         "args":{
-            "method":"sgd",
-            "lr": 1,
-            "lr_decay": 0.5,
+            "method":"adam",
+            "lr": 0.0001,
+            "lr_decay": 1,
             "max_grad_norm": 5,
-            "start_decay_at": 20
+            "start_decay_at": null
         }
     },
     "translator": {
         "type": "Translator",
         "args":{
             "replace_unk": true,
-            "beam_width": 5,
+            "beam_width": 10,
             "n_best": 1,
             "max_length": 50
         },
         "output": "output.txt"
     },
     "loss": "nll_loss",
-    "metrics": [
-        "my_metric", "my_metric2"
-    ],
+    "metrics": [],
     "trainer": {
         "epochs": 50,
         "save_dir": "data/saved/",

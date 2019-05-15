@@ -4,9 +4,9 @@
     "arch": {
         "type": "Model",
         "args": {
-             "vocab_emb_dim": 504,
-             "lang_emb_dim": 4,
-             "style_emb_dim": 4,
+             "vocab_emb_dim": 502,
+             "lang_emb_dim": 5,
+             "style_emb_dim": 5,
              "in_vocab_size": 8000,
              "num_lang": 2,
              "num_style": 1,
@@ -15,7 +15,7 @@
              "num_layers": 2,
              "dropout_ratio": 0.3,
              "brnn": true,
-             "input_feed": true
+             "input_feed": false
         }
     },
     "train_data_loader": {
@@ -68,11 +68,11 @@
     "optimizer": {
         "type": "Optim",
         "args":{
-            "method":"sgd",
-            "lr": 1,
-            "lr_decay": 0.5,
+            "method":"adam",
+            "lr": 0.0001,
+            "lr_decay": 1,
             "max_grad_norm": 5,
-            "start_decay_at": 20
+            "start_decay_at": null
         }
     },
     "translator": {
@@ -86,9 +86,7 @@
         "output": "output.txt"
     },
     "loss": "nll_loss",
-    "metrics": [
-        "my_metric", "my_metric2"
-    ],
+    "metrics": [],
     "trainer": {
         "epochs": 50,
         "save_dir": "data/saved/",
