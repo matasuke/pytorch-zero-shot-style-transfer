@@ -56,8 +56,8 @@ if __name__ == '__main__':
     for source, target in zip(args.source_paths, args.target_paths):
         source = Path(source)
         target = Path(target)
-        assert source.exists()
-        assert target.exists()
+        assert source.exists(), source
+        assert target.exists(), target
 
         if not save_dir.exists():
             save_dir.mkdir(parents=True)

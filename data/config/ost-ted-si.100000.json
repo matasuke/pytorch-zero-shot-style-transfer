@@ -1,0 +1,114 @@
+{
+    "name": "zero-shot-style-transfer-sample-100000",
+    "n_gpu": 1,
+    "arch": {
+        "type": "Model",
+        "args": {
+             "vocab_emb_dim": 502,
+             "lang_emb_dim": 5,
+             "style_emb_dim": 5,
+             "in_vocab_size": 32000,
+             "num_lang": 3,
+             "num_style": 3,
+             "out_vocab_size": 32000,
+             "hidden_dim": 512,
+             "num_layers": 3,
+             "dropout_ratio": 0.3,
+             "brnn": true,
+             "input_feed": false
+        }
+    },
+    "train_data_loader": {
+        "type": "Seq2seqDataLoader",
+        "args":{
+            "src_paths": [
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.en-ja.en",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.en-ja.ja",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.en-zh_cn.en",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.en-zh_cn.zh_cn",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.ja-zh_cn.ja",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.ja-zh_cn.zh_cn",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/TED.20190427.ja",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/TED.20190427.en",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/TED.ja",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/TED.ch"
+            ],
+            "tgt_paths": [
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.en-ja.ja",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.en-ja.en",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.en-zh_cn.zh_cn",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.en-zh_cn.en",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.ja-zh_cn.zh_cn",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.ja-zh_cn.ja",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/TED.20190427.en",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/TED.20190427.ja",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/TED.ch",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/TED.ja"
+            ],
+            "tgt_languages": [
+                    "<2JA>","<2EN>","<2CH>","<2EN>","<2CH>",
+                    "<2JA>","<2EN>","<2JA>","<2CH>","<2JA>"
+            ],
+            "tgt_styles": [
+                    "<2OST>","<2OST>","<2OST>","<2OST>","<2OST>",
+                    "<2OST>","<2SI>","<2SI>","<2TED>","<2TED>"
+            ],
+            "text_preprocessor_path": "data/corpora/prorcessed/limit-50/sample-100000/tokenized/preprocessor/ost-ted-si.32000.pkl",
+            "batch_size": 128,
+            "shuffle": true,
+            "validation_split": 0.1,
+            "num_workers": 4
+        }
+    },
+    "test_data_loader": {
+        "type": "Seq2seqDataLoader",
+        "args":{
+            "src_path": [
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.en-ja.ja",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/TED.tokenized.ja"
+            ],
+            "tgt_path": [
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/OpenSubtitles.en-ja.ja",
+                    "data/corpora/processed/limit-50/sample-100000/tokenized/TED.tokenized.ja"
+            ],
+            "tgt_languages": ["<2JA>", "<2JA>"],
+            "tgt_styles": ["<2SI>","<2SI>"],
+            "text_preprocessor_path": "data/corpora/prorcessed/limit-50/sample-100000/tokenized/preprocessor/ost-ted-si.32000.pkl",
+            "batch_size": 128,
+            "shuffle": false,
+            "num_workers": 4
+        }
+    },
+    "optimizer": {
+        "type": "Optim",
+        "args":{
+            "method":"adam",
+            "lr": 0.0001,
+            "lr_decay": 1,
+            "max_grad_norm": 5,
+            "start_decay_at": null
+        }
+    },
+    "translator": {
+        "type": "Translator",
+        "args":{
+            "replace_unk": true,
+            "beam_width": 10,
+            "n_best": 1,
+            "max_length": 50
+        },
+        "output": "output.txt"
+    },
+    "loss": "nll_loss",
+    "metrics": [],
+    "trainer": {
+        "epochs": 50,
+        "save_dir": "data/saved/",
+        "save_period": 1,
+        "verbosity": 2,
+        "monitor": "min val_loss",
+        "early_stop": 10,
+        "tensorboardX": true,
+        "log_dir": "data/saved/runs"
+    }
+}
