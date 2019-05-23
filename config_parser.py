@@ -1,11 +1,13 @@
 import argparse
+from functools import reduce
 import json
 import logging
 import os
+from operator import getitem
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, NamedTuple
 
 import yaml
 try:
@@ -25,15 +27,20 @@ class ConfigParser:
     '''
     Parser to load json or yaml based configuration files for pytorch
     '''
-    def __init__(self, args: Dict, timestamp: bool=True):
+    def __init__(
+            self,
+            args: Dict,
+            options: Optional[List['CustomArgs']]=None,
+            timestamp: bool=True
+    ):
         if "device" in args:
             os.environ["CUDA_VISIBLE_DEVICES"] = args['device']
             self.device = [int(device) for device in args['device'].split(',')]
 
-        if 'resume' in args:
+        if args['resume']:
             self.resume: Union[Path, None] = Path(args['resume'])
             self.cfg_fname = self.resume.parent / DEFAULT_CONFIG_FILE_NAME
-        elif 'config' in args:
+        elif args['config']:
             self.resume: Union[Path, None] = None
             self.cfg_fname = Path(args['config'])
         else:
@@ -42,7 +49,7 @@ class ConfigParser:
             raise ValueError(msg_no_cfg)
 
         self._config = self.load(self.cfg_fname)
-        self._update(args)
+        self._apply_options(args, options)
 
         # set save_dir where trained model and log will be saved
         save_dir = Path(self._config["trainer"]["save_dir"])
@@ -91,60 +98,149 @@ class ConfigParser:
         return getattr(module, module_cfg["type"])(*args, **module_cfg["args"])
 
     @classmethod
-    def parse(cls, args: Union[Dict, "argparse.Namespace"], timestamp: bool=True) -> "ConfigParser":
+    def parse_args(
+            cls,
+            args: "argparse.ArgumentParser",
+            options: Optional[List['CustomArgs']]=None,
+            timestamp: bool=True
+    ) -> "ConfigParser":
         """
         parse arguments from dict or argumentparser
 
         :param args: parameters to save.
         """
-        if isinstance(args, argparse.Namespace):
-            arguments = {}
-            for (key, value) in vars(args).items():
-                if value is not None:
-                    arguments[key] = value
-        else:
-            arguments = args
+        assert isinstance(args, argparse.ArgumentParser)
+        if options is not None:
+            for opt in options:
+                if opt.choices is not None:
+                    args.add_argument(*opt.flags, default=None, type=opt.type, choices=opt.choices)
+                else:
+                    args.add_argument(*opt.flags, default=None, type=opt.type)
+        args = args.parse_args()
 
-        return cls(arguments, timestamp)
+        arguments = {}
+        for (key, value) in vars(args).items():
+            arguments[key] = value
 
-    def add(self, key: str, value: Any, update: bool = False) -> None:
+        return cls(arguments, options, timestamp)
+
+    def get_param(self, key: str, default: Optional[Any] = None) -> Any:
+        """
+        get value from key. this is wrapper for getting parameters
+        """
+        if hasattr(self, key):
+            return getattr(self, key)
+        return default
+
+    def add_param(self, key: str, value: Any, update: bool = False) -> None:
         """
         add argument if key is not exists.
         it updates value when update=True
         """
-        if self._config.get(key) is not None:
-            if update and self.config.get(key) != value:
-                print(f"Update parameter {key}: {self.get(key)} -> {value}")
-                setattr(self._config, key, value)
+        if hasattr(self, key):
+            if update and getattr(self, key) != value:
+                print(f"Update parameter {key}: {getattr(self, key)} -> {value}")
+                setattr(self, key, value)
         else:
-            setattr(self._config, key, value)
+            setattr(self, key, value)
 
-    def _update(self, args: Dict) -> None:
-        '''
-        update config with args.
-        loaded config file is OVERWRITTEN by args.
-        '''
-        assert isinstance(args, dict)
-        for (key, value) in args.items():
-            if key not in EXCLUTED_ARGS:
-                self.add(key, value, update=True)
+    def update_param(self, key: str, value: Any):
+        """
+        update argument if key is exists
+        """
+        self.add_param(key, value, update=True)
 
-    def del_hparam(self, key: str) -> None:
+    def del_param(self, key: str) -> None:
         """
         delete argument if key is exists.
         """
-        if hasattr(self._config, key):
+        if hasattr(self, key):
             print(f"Delate parameter {key}")
-            delattr(self._config, key)
+            delattr(self, key)
 
-    def get(self, key: str, default: Optional[Any] = None) -> Any:
+    def get_config(self, target: List[str], default: Optional[Any] = None) -> Any:
         """
         get value from key. this is wrapper for __getitem__
         """
-        if hasattr(self._config, key):
-            return getattr(self._config, key)
+        return self.__get_by_path(self._config, target, default)
 
-        return default
+    def add_config(self, target: List[str], value: Any, update: bool = False) -> None:
+        """
+        add config parameters if key is not exists.
+        it updates value when update=True
+        """
+        old_value = self.get_config(target)
+        if old_value is not None:
+            if update and old_value != value:
+                print(f"Update config parameter {'-> '.join(target)}: {old_value} -> {value}")
+                self.__get_by_path(self._config, target[:-1])[target[-1]] = value
+        else:
+            self.__get_by_path(self._config, target[:-1])[target[-1]] = value
+
+    def update_config(self, target: List[str], value: Any) -> None:
+        """
+        update config parameters if key is exists
+        """
+        self.add_config(target, value, update=True)
+
+    def del_config(self, target: List[str]) -> None:
+        """
+        delete config parameters if key is exists.
+        """
+        if self.get_config(target) is not None:
+            print(f"Delate parameter {'-'.join(target)[-1]}")
+            delattr(self.__get_by_path(self._config, target[:-1]), target[-1])
+
+    def _apply_options(
+            self,
+            args: Dict,
+            options: Optional[List['Customargs']]=None,
+    ) -> None:
+        '''
+        apply Customargs to self._config
+        loaded config file is OVERWRITTEN by args.
+        '''
+        if options:
+            for opt in options:
+                value = args.get(self.__get_opt_name(opt.flags))
+                if value is not None:
+                    self.update_config(opt.target, value)
+
+    @staticmethod
+    def __get_opt_name(flags: List[str]):
+        '''
+        get option name from CustomArgs's flag
+        '''
+        for flag in flags:
+            if flag.startswith('--'):
+                return flag.replace('--', '')
+        return flags[0].replace('--', '')
+
+    def __set_by_path(self, tree: Union[Dict, 'OrderedDict'], target: List[str], value: Any) -> None:
+        '''
+        update value on the target position
+        '''
+        self.__get_by_path(self._config, target[:-1])[target[-1]] = value
+
+    @staticmethod
+    def __get_by_path(
+            tree: Union[Dict, 'OrderedDict'],
+            target: List[str],
+            default: bool=None,
+    ):
+        """
+        get config parameter based on target
+
+        :param tree: dict or OrderedDict to fetch target value
+        :param target: list of target.
+        :param default: default value when specified target does not exists.
+        """
+        try:
+            value = reduce(getitem, target, tree)
+        except KeyError:
+            value = default
+
+        return value
 
     @classmethod
     def load(cls, config_path: Union[str, Path]) -> Dict:
@@ -227,3 +323,19 @@ class ConfigParser:
     def test_dir(self):
         'get the path to test directory.'
         return self._test_dir
+
+
+class CustomArgs(NamedTuple):
+    flags: List[str]
+    type: str
+    target: List[str]
+    choices: Optional[List[str]]=None
+
+    def __repr__(self) -> str:
+        return f'<CustomArgs flags={self.flags}, type={self.type}, target={self.target}>'
+
+    def __str__(self) -> str:
+        text = "CUSTOMARGS\n" + "-" * 20 + "\n"
+        for (key, value) in self.__dict__.items():
+            text += f"{key}:\t{value}" + "\n"
+        return text

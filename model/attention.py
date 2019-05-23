@@ -5,7 +5,8 @@ import torch.nn as nn
 
 GENERAL_METHOD = 'general'
 DOT_METHOD = 'dot'
-ATTENTION_METHODS = [GENERAL_METHOD, DOT_METHOD]
+CONCAT_METHOD = 'concat'
+ATTENTION_METHODS = [GENERAL_METHOD, DOT_METHOD, CONCAT_METHOD]
 
 
 class Attention(nn.Module):
@@ -25,7 +26,7 @@ class Attention(nn.Module):
         >>> attn.size()
         torch.Size([5, 1, 5])
     '''
-    __slots__ = [
+    __slot__ = [
         'hidden_dim',
         'attention_type',
         'attn_in',
@@ -35,12 +36,14 @@ class Attention(nn.Module):
         'mask',
     ]
 
-    def __init__(self, hidden_dim: int, attention_type: str=GENERAL_METHOD):
+    def __init__(
+            self, hidden_dim: int,
+            attention_type: str=GENERAL_METHOD
+    ):
         super(Attention, self).__init__()
 
         if attention_type not in ATTENTION_METHODS:
             raise ValueError(f'Unknown attention type: {attention_type}')
-
         self.hidden_dim = hidden_dim
         self.attention_type = attention_type
 
@@ -74,9 +77,6 @@ class Attention(nn.Module):
 
         # [batch_size, hidden_dim, 1] * [batch_size, source_length, hidden_dim] -> [batch_size, source_length]
         attn_scores = torch.bmm(context, queryT).squeeze(2)
-
-        print('attn', attn_scores.shape)
-        print('mask', self.mask.shape)
         if self.mask is not None:
             attn_scores.masked_fill_(self.mask, -float('inf'))
 

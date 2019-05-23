@@ -1,5 +1,5 @@
 {
-    "name": "small-parallel-test",
+    "name": "small-parallel-ted-si",
     "n_gpu": 1,
     "arch": {
         "type": "Model",
@@ -7,10 +7,10 @@
              "vocab_emb_dim": 502,
              "lang_emb_dim": 5,
              "style_emb_dim": 5,
-             "in_vocab_size": 8000,
+             "in_vocab_size": 32000,
              "num_lang": 2,
-             "num_style": 1,
-             "out_vocab_size": 8000,
+             "num_style": 2,
+             "out_vocab_size": 32000,
              "hidden_dim": 512,
              "num_layers": 2,
              "dropout_ratio": 0.3,
@@ -23,20 +23,24 @@
         "args":{
             "src_paths": [
                     "data/corpora/raw/small_parallel/train.en",
-                    "data/corpora/raw/small_parallel/train.ja"
+                    "data/corpora/raw/small_parallel/train.ja",
+                    "data/corpora/raw/ted_si_small/TED.20190427.tokenized.en",
+                    "data/corpora/raw/ted_si_small/TED.20190427.tokenized.ja"
             ],
             "tgt_paths": [
                     "data/corpora/raw/small_parallel/train.ja",
-                    "data/corpora/raw/small_parallel/train.en"
+                    "data/corpora/raw/small_parallel/train.en",
+                    "data/corpora/raw/ted_si_small/TED.20190427.tokenized.ja",
+                    "data/corpora/raw/ted_si_small/TED.20190427.tokenized.en"
             ],
             "tgt_languages": [
-                    "<2JA>","<2EN>"
+                    "<2JA>","<2EN>", "<2JA>","<2EN>"
             ],
             "tgt_styles": [
-                    "<2SMALL>", "<2SMALL>"
+                    "<2SMALL>", "<2SMALL>", "<2SI>", "<2SI>"
             ],
-            "text_preprocessor_path": "data/preprocessor/small-parallel-8000.pkl",
-            "batch_size": 128,
+            "text_preprocessor_path": "data/preprocessor/small-parallel-ted-si-32000.pkl",
+            "batch_size": 64,
             "shuffle": true,
             "validation_split": 0.1,
             "num_workers": 4
@@ -54,13 +58,13 @@
                     "data/corpora/raw/small_parallel/train.en"
             ],
             "tgt_languages": [
-                    "<2JA>","<2EN>"
+                    "<2JA>","<2JA>"
             ],
             "tgt_styles": [
-                    "<2SMALL>", "<2SMALL>"
+                    "<2I>", "<2SI>"
             ],
-            "text_preprocessor_path": "data/preprocessor/small-parallel-8000.pkl",
-            "batch_size": 128,
+            "text_preprocessor_path": "data/preprocessor/small-parallel-ted-si-32000.pkl",
+            "batch_size": 64,
             "shuffle": false,
             "num_workers": 4
         }
@@ -82,16 +86,6 @@
             "beam_width": 5,
             "n_best": 1,
             "max_length": 50
-        },
-        "output": "output.txt"
-    },
-    "translator": {
-        "type": "Translator",
-        "args": {
-            "decoder_type": "greedy",
-            "max_length": 50,
-            "beam_width": 5,
-            "n_best": 1
         },
         "output": "output.txt"
     },

@@ -92,17 +92,15 @@
     "translator": {
         "type": "Translator",
         "args":{
-            "replace_unk": true,
+            "decode_type": "greedy",
+            "max_length": 50,
             "beam_width": 5,
-            "n_best": 1,
-            "max_length": 50
+            "n_best": 1
         },
         "output": "output.txt"
     },
     "loss": "nll_loss",
-    "metrics": [
-        "my_metric", "my_metric2"
-    ],
+    "metrics": [],
     "trainer": {
         "epochs": 50,
         "save_dir": "data/saved/",

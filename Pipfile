@@ -10,12 +10,14 @@ pytest = "python -m pytest -vv"
 
 [packages]
 tqdm = "*"
+pillow = "*"
 pyyaml = "*"
-torch= ">=1.0"
 gensim = "*"
+tensorboard = "*"
+torch = "==1.1.0"
+tb-nightly = "==1.14.0a20190522"
 
 [dev-packages]
-codecov = "*"
 flake8 = "==3.5.0"
 mypy = "*"
 jupyter = "*"

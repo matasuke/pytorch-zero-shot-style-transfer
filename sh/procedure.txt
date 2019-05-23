@@ -1,4 +1,5 @@
-# sh sh/limit.sh
+# normalizer ?
+# sh sh/limit.sh # it seeems not to be necessary
 # sh sh/sample.sh
 # sh sh/tokenize.sh
 # sh sh/preprocess.sh

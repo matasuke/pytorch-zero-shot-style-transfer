@@ -54,9 +54,9 @@
                     "<2OST>","<2SI>","<2SI>","<2TED>","<2TED>"
             ],
             "text_preprocessor_path": "data/corpora/processed/limit-50/sample-100000/tokenized/preprocessor/ost-ted-si.32000.pkl",
-            "batch_size": 128,
+            "batch_size": 32,
             "shuffle": true,
-            "validation_split": 0.1,
+            "validation_split": 0.05,
             "num_workers": 4
         }
     },
@@ -74,7 +74,7 @@
             "tgt_languages": ["<2JA>", "<2JA>"],
             "tgt_styles": ["<2SI>","<2SI>"],
             "text_preprocessor_path": "data/corpora/processed/limit-50/sample-100000/tokenized/preprocessor/ost-ted-si.32000.pkl",
-            "batch_size": 128,
+            "batch_size": 32,
             "shuffle": false,
             "num_workers": 4
         }
@@ -90,9 +90,8 @@
         }
     },
     "translator": {
-        "type": "Translator",
+        "type": "GreadySearch",
         "args":{
-            "replace_unk": true,
             "beam_width": 10,
             "n_best": 1,
             "max_length": 50

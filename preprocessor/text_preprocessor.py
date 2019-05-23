@@ -109,6 +109,8 @@ class TextPreprocessor:
         token_list, _ = zip(*count_pairs)
 
         token_list = cls.SYMBOLS + list(token_list)
+        print(f'Total vocab size: {len(count_pairs)}')
+
         if max_vocab_size is not None:
             token_list = token_list[:max_vocab_size]
 

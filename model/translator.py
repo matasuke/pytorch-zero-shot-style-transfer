@@ -9,49 +9,197 @@ from .beam import Beam
 from preprocessor.text_preprocessor import TextPreprocessor
 
 
-class Translator(object):
+TYPE_GREEDY = 'greedy'
+TYPE_BEAM = 'beam'
+DECODER_TYPE = [TYPE_GREEDY, TYPE_BEAM]
+
+
+class Translator:
+    '''
+    wrapper class for GreedySearchDecoder and BeamSearchDecoder
+    '''
     def __init__(
             self,
             model: Model,
             text_preprocessor: TextPreprocessor,
-            replace_unk: bool=True,
+            decoder_type: str,
+            max_length: int=50,
             beam_width: int=5,
             n_best: int=1,
+    ):
+        if decoder_type == TYPE_GREEDY:
+            self.translator = GreedySearch(
+                model,
+                text_preprocessor,
+                max_length,
+            )
+        elif decoder_type == TYPE_BEAM:
+            self.translator = BeamSearch(
+                model,
+                text_preprocessor,
+                max_length,
+                beam_width,
+                n_best,
+            )
+        else:
+            msg = f'Unknown decoder type: {decoder_type}'
+            raise ValueError(msg)
+
+    def translate(
+            self,
+            src_batch: torch.Tensor,
+            tgt_lang: torch.Tensor,
+            tgt_style: torch.Tensor,
+            lengths: List[int],
+            indices: List[int],
+    ) -> Tuple[List, List, List]:
+        '''
+        translate sentences basedon choosen decoder.
+
+        :src_batch: source batch size of [max_len, batch_size]
+        :tgt_lang: target langauges size of [batch_size, ]
+        :tgt_styles: target styles size of [batch_size, ]
+        :lengths: length of each source sentence
+        :indices: indices to be used for sorting
+        '''
+        pred_batch = self.translator.translate(
+            src_batch,
+            tgt_lang,
+            tgt_style,
+            lengths,
+            indices,
+        )
+
+        return pred_batch
+
+
+class GreedySearch(nn.Module):
+    '''
+    Greedy search decoder for neural language generation.
+    '''
+    def __init__(
+            self,
+            model: Model,
+            text_preprocessor: TextPreprocessor,
             max_length: int=50,
     ):
-        self.replace_unk = replace_unk
-        self.beam_width = beam_width
-        self.n_best = n_best
+        super(GreedySearch, self).__init__()
+        self.text_preprocessor = text_preprocessor
         self.max_length = max_length
 
         if torch.cuda.is_available():
             self.tt = torch.cuda
+            self.model = model.cuda()
         else:
             self.tt = torch
+            self.model = model.cpu()
 
+        self.model.eval()
+
+    def translate_batch(
+            self,
+            src_batch: torch.Tensor,
+            tgt_lang: torch.Tensor,
+            tgt_style: torch.Tensor,
+            lengths: List[int],
+    ) -> Tuple[List, List]:
+        '''
+        forward input through greedy search decoder
+
+        :param src_batch: source batch size of [max_len, batch_size, hidden_dim]
+        :param tgt_lang: target languages to be translated size of [batch_size,]
+        :param tgt_style: target styles to be translated size of [batch_size,]
+        :param lengths: list of length of source batch
+        '''
+        batch_size = src_batch.size(1)
+
+        # (1) run the encoder on the src
+        enc_hidden, context = self.model.encoder(src_batch, tgt_lang, tgt_style, lengths)
+
+        dec_output = self.model.make_init_decoder_output(context)
+        enc_hidden = (self.model._fix_enc_hidden(enc_hidden[0]),
+                      self.model._fix_enc_hidden(enc_hidden[1]))
+
+        #  This mask is applied to the attention model inside the decoder
+        #  so that the attention ignores source padding
+        pad_mask = src_batch.data.eq(TextPreprocessor.PAD_ID).t()
+
+        def apply_context_mask(mask: GlobalAttention):
+            if isinstance(mask, GlobalAttention):
+                mask.applyMask(pad_mask)
+
+        dec_input = self.tt.LongTensor([[TextPreprocessor.SOS_ID for _ in range(batch_size)]])
+        output_tokens = self.tt.LongTensor([[TextPreprocessor.SOS_ID for _ in range(batch_size)]])
+
+        # (2) run the decoder to generate sentences using greedy search
+        for _ in range(self.max_length):
+            self.model.decoder.apply(apply_context_mask)
+            dec_output, enc_hidden, _ = self.model.decoder(
+                dec_input,
+                enc_hidden,
+                context,
+                dec_output,
+            )
+            # [batch_size, hidden_dim] > [batch_size, num_words]
+            out = self.model.generator.forward(dec_output.squeeze(0))
+            _, dec_input = torch.max(out, dim=1)
+
+            # prepare current token to be next decoder input
+            dec_input = dec_input.unsqueeze(0)
+            output_tokens = torch.cat([output_tokens, dec_input], dim=0)
+
+        output_tokens = output_tokens[1:].t().tolist()
+
+        return output_tokens
+
+    def translate(
+            self,
+            src_batch: torch.Tensor,
+            tgt_lang: torch.Tensor,
+            tgt_style: torch.Tensor,
+            lengths: List[int],
+            indices: List[int],
+    ) -> Tuple[List, List, List]:
+        #  (1) translate
+        pred = self.translate_batch(src_batch, tgt_lang, tgt_style, lengths)
+        pred = list(zip(*sorted(zip(pred, indices), key=lambda x: x[-1])))[0]
+
+        #  (2) convert indexes to words
+        pred_batch = []
+        for batch_idx in range(src_batch.size(1)):
+            tokens = self.text_preprocessor.indice2tokens(pred[batch_idx], stop_eos=True)
+            pred_batch.append([tokens])
+
+        return pred_batch
+
+
+class BeamSearch(nn.Module):
+    def __init__(
+            self,
+            model: Model,
+            text_preprocessor: TextPreprocessor,
+            max_length: int=50,
+            beam_width: int=5,
+            n_best: int=1,
+    ):
+        super(BeamSearch, self).__init__()
+        self.beam_width = beam_width
+        self.n_best = n_best
+        self.max_length = max_length
         self.text_preprocessor = text_preprocessor
 
         if torch.cuda.is_available():
-            model = model.cuda()
+            self.tt = torch.cuda
+            self.model = model.cuda()
         else:
-            model = model.cpu()
+            self.tt = torch
+            self.model = model.cpu()
 
-        self.model = model
         self.model.eval()
-
-    def buildTargetTokens(self, pred, src, attn):
-        tokens = self.text_preprocessor.indice2tokens(pred, stop_eos=True)
-        if self.replace_unk:
-            for i in range(len(tokens)):
-                if tokens[i] == TextPreprocessor.UNK_ID:
-                    _, maxIndex = attn[i].max(0)
-                    tokens[i] = src[maxIndex[0]]
-        return tokens
 
     def translateBatch(
             self,
             src_batch: torch.Tensor,
-            tgt_batch: Union[torch.Tensor, None],
             tgt_lang: torch.Tensor,
             tgt_style: torch.Tensor,
             lengths: List[int],
@@ -73,25 +221,7 @@ class Translator(object):
             if isinstance(m, GlobalAttention):
                 m.applyMask(padMask)
 
-        #  (2) if a target is specified, compute the 'goldScore'
-        #  (i.e. log likelihood) of the target under the model
-        goldScores = context.data.new_zeros(batch_size)
-
-        if tgt_batch is not None:
-            decStates = encStates
-            decOut = self.model.make_init_decoder_output(context)
-            self.model.decoder.apply(applyContextMask)
-            initOutput = self.model.make_init_decoder_output(context)
-            decOut, decStates, attn = self.model.decoder(
-                tgt_batch[:-1], decStates, context, initOutput)
-            for dec_t, tgt_t in zip(decOut, tgt_batch[1:].data):
-                gen_t = self.model.generator.forward(dec_t)
-                tgt_t = tgt_t.unsqueeze(1)
-                scores = gen_t.data.gather(1, tgt_t)
-                scores.masked_fill_(tgt_t.eq(TextPreprocessor.PAD_ID), 0)
-                goldScores += scores.view(-1)
-
-        #  (3) run the decoder to generate sentences, using beam search
+        #  (2) run the decoder to generate sentences, using beam search
 
         # Expand tensors for each beam.
         context = context.data.repeat(1, self.beam_width, 1)
@@ -102,7 +232,6 @@ class Translator(object):
 
         decOut = self.model.make_init_decoder_output(context)
 
-        # padMask = src_batch.data.eq(TextPreprocessor.PAD_ID).t().unsqueeze(0).repeat(self.beam_width, 1, 1)
         padMask = src_batch.data.eq(TextPreprocessor.PAD_ID).t().repeat(self.beam_width, 1)
         batchIdx = list(range(batch_size))
         remainingSents = batch_size
@@ -161,51 +290,39 @@ class Translator(object):
 
             remainingSents = len(active)
 
-        #  (4) package everything up
+        #  (3) package everything up
 
-        allHyp, allScores, allAttn = [], [], []
+        all_hyp = []
         n_best = self.n_best
-
         for b in range(batch_size):
             scores, ks = beam[b].sortBest()
 
-            allScores += [scores[:n_best].tolist()]
-            valid_attn = src_batch.data[:, b].ne(TextPreprocessor.PAD_ID).nonzero().squeeze(1)
-            # hyps, attn = zip(*[beam[b].getHyp(k) for k in ks[:n_best]])
-            hyps, attn = [], []
+            hyps = []
             for k in ks[:n_best]:
-                hyp, att = beam[b].getHyp(k)
+                hyp, _ = beam[b].getHyp(k)
                 hyps.append(torch.stack(hyp).tolist())
-                attn.append(att)
-            attn = [a.index_select(1, valid_attn) for a in attn]
-            # allHyp += [[int(i) for i in hyps[j]] for j in len(hyps)]
-            # allAttn.append([(i.tolist(),) for i in attn])
-            allHyp += [hyps]
-            allAttn += [attn]
+            all_hyp += [hyps]
 
-        return allHyp, allScores, allAttn, goldScores
+        return all_hyp
 
     def translate(
             self,
             src_batch: torch.Tensor,
-            tgt_batch: Union[torch.Tensor, None],
             tgt_lang: torch.Tensor,
             tgt_style: torch.Tensor,
             lengths: List[int],
             indices: List[int],
     ) -> Tuple[List, List, List]:
         #  (2) translate
-        pred, pred_score, attn, gold_score = \
-            self.translateBatch(src_batch, tgt_batch, tgt_lang, tgt_style, lengths)
-        pred, pred_score, attn, gold_score = \
-            list(zip(*sorted(zip(pred, pred_score, attn, gold_score, indices), key=lambda x: x[-1])))[:-1]
+        pred = self.translateBatch(src_batch, tgt_lang, tgt_style, lengths)
+        pred = list(zip(*sorted(zip(pred, indices), key=lambda x: x[-1])))[0]
 
         #  (3) convert indexes to words
         pred_batch = []
-        for b in range(src_batch.size(1)):
+        for batch_idx in range(src_batch.size(1)):
             pred_batch.append(
-                [self.buildTargetTokens(pred[b][n], src_batch[:, b], attn[b][n])
+                [self.text_preprocessor.indice2tokens(pred[batch_idx][n], stop_eos=True)
                  for n in range(self.n_best)]
             )
 
-        return pred_batch, pred_score, gold_score
+        return pred_batch

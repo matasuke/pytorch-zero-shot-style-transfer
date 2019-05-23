@@ -86,7 +86,6 @@ class Trainer(BaseTrainer):
             loss.backward()
             self.optimizer.step()
 
-            self.writer.set_step((epoch - 1) * len(self.data_loader) + batch_idx)
             self.writer.add_scalar('loss', loss.item())
             self.writer.add_scalar('ppl', np.exp(loss.item()))
             total_loss += loss.item()
@@ -143,7 +142,6 @@ class Trainer(BaseTrainer):
                 output = output.squeeze(0)
                 loss = self.loss(output, tgt[1:].view(-1))  # exclude <SOS> from targets
 
-                self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
                 self.writer.add_scalar('loss', loss.item())
                 total_val_loss += loss.item()
                 total_val_ppl += np.exp(loss.item())
